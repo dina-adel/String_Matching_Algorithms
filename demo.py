@@ -1,5 +1,5 @@
 from src.performance_evaluator import PerformanceEvaluator
-from src.datasets import load_sample_dataset
+from src.datasets.sample_dataset import load_sample_dataset
 from src.algorithims.finite_automata import FiniteAutomataMatching
 from src.algorithims.z import ZAlgorithm    
 from src.algorithims.bitap import BitapAlgorithm
