@@ -1,4 +1,4 @@
-# String_Matching_Algorithms
+# COSC 520: Course Project: String_Matching_Algorithms
 
 ### 1. Installation
 
