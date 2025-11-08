@@ -7,10 +7,11 @@
 pip install -r requirements.txt
 ```
 
-### 2. Run the Demo
+### 2. Run the Demo or the Evaluation script
 
 ```bash
 python demo.py
+python evaluate.py
 ```
 
 This will execute all algorithms on sample datasets and generate performance comparison plots.
@@ -26,9 +27,12 @@ string-matching-project/
         ├── z.py
         ├── bitap.py
         ├── finite_automata.py
-    ├── datasets.py             # Handle dataset generation and sampling
+    ├── datasets                    # dataset generation and sampling
+        ├── data_loaders.py         # loading both sample and realistic data
+        ├── download_create_datasets.py      # downloading datasets & creating relevant patterns
     ├── performance_evaluator.py    # A class to handle algorithms evaluation
-├── demo.py                     # A demo run file
+├── demo.py                     # A demo run file using sample data
+├── evaluate.py                 # Evaluation script with real data
 ├── requirements.txt            # Python dependencies
 └── README.md                   # This file
 ```

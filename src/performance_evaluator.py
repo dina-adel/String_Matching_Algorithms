@@ -42,6 +42,7 @@ class PerformanceEvaluator:
         results = {}
         
         # Finite Automata
+        print("\nRunning Finite Automata Matching...")
         fa = FiniteAutomataMatching(pattern)
         matches_fa, time_fa = PerformanceEvaluator.measure_time(fa, text, pattern)
         results['Finite Automata'] = {
@@ -51,6 +52,7 @@ class PerformanceEvaluator:
         }
         
         # Z-Algorithm
+        print("Running Z-Algorithm Matching...")
         z_algo = ZAlgorithm(pattern)
         matches_z, time_z = PerformanceEvaluator.measure_time(z_algo, text, pattern)
         results['Z-Algorithm'] = {
@@ -60,6 +62,7 @@ class PerformanceEvaluator:
         }
         
         # Bitap Algorithm (only if pattern length <= 64)
+        print("Running Bitap Matching...")
         if len(pattern) <= 64:
             bitap = BitapAlgorithm(pattern)
             matches_bitap, time_bitap = PerformanceEvaluator.measure_time(bitap, text, pattern)
@@ -69,6 +72,8 @@ class PerformanceEvaluator:
                 'count': len(matches_bitap)
             }
         
+        print("All algorithms completed.")
+        print("-" * 40)
         return results
     
     @staticmethod
