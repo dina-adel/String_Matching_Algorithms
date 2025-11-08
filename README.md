@@ -21,6 +21,7 @@ This will execute all algorithms on sample datasets and generate performance com
 ## Project Structure
 
 ```
+├── data                                        # folder where data is downloaded
 ├── src
 
     ├── algorithms                              # algorithms implementation
