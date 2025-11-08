@@ -21,20 +21,23 @@ This will execute all algorithms on sample datasets and generate performance com
 ## Project Structure
 
 ```
-string-matching-project/
 ├── src
-    ├── algorithms
+
+    ├── algorithms                              # algorithms implementation
         ├── z.py
         ├── bitap.py
         ├── finite_automata.py
-    ├── datasets                    # dataset generation and sampling
-        ├── data_loaders.py         # loading both sample and realistic data
-        ├── download_create_datasets.py      # downloading datasets & creating relevant patterns
-    ├── performance_evaluator.py    # A class to handle algorithms evaluation
-├── demo.py                     # A demo run file using sample data
-├── evaluate.py                 # Evaluation script with real data
-├── requirements.txt            # Python dependencies
-└── README.md                   # This file
+
+    ├── datasets                                # dataset generation and sampling
+        ├── data_loaders.py                     # loading both sample and realistic data
+        ├── download_create_datasets.py         # downloading datasets & creating relevant patterns
+
+    ├── performance_evaluator.py                # A class to handle algorithms evaluation
+
+├── demo.py                                     # A demo run file using sample data
+├── evaluate.py                                 # Evaluation script with real data
+├── requirements.txt                            # Python dependencies
+└── README.md                                   # This file
 ```
 
 ---
