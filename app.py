@@ -12,7 +12,8 @@ APP_STATE = {
     "current_text": "",
     "current_dataset_name": "sample_dna",
     "datasets": {},
-    "last_results": [] # Store for export
+    "last_results": [],
+    "last_pattern": ""  # Store the actual pattern used
 }
 
 def init_datasets():
@@ -80,33 +81,45 @@ def run_operation():
     algo = data.get('algorithm')
     pattern = data.get('pattern')
     insert_text = data.get('insert_text', '')
+    case_sensitive = data.get('case_sensitive', False)
     
     if not pattern:
         return jsonify({"error": "Pattern is required"}), 400
         
     text = APP_STATE["current_text"]
+    original_pattern = pattern
+    
+    # Store original pattern for highlighting
+    APP_STATE["last_pattern"] = original_pattern
+    
+    # Convert to lowercase for case-insensitive search
+    if not case_sensitive:
+        text = text.lower()
+        pattern = pattern.lower()
+    
     results = []
 
     if algo == "All":
         algorithms = ["Finite Automata", "Z-Algorithm"]
-        # Only add Bitap if pattern is short enough
         if len(pattern) <= 64:
             algorithms.append("Bitap")
             
         for a in algorithms:
             res = AlgorithmWrapper.run_operation(op_type, a, text, pattern, insert_text)
             if "error" not in res:
+                # Add the original pattern for display
+                res["original_pattern"] = original_pattern
+                res["case_sensitive"] = case_sensitive
                 results.append(res)
     else:
         res = AlgorithmWrapper.run_operation(op_type, algo, text, pattern, insert_text)
         if "error" in res:
             return jsonify(res), 400
+        res["original_pattern"] = original_pattern
+        res["case_sensitive"] = case_sensitive
         results.append(res)
     
-    # Update state if text modified (only takes effect from the first successful run if multiple)
-    # For "All", we probably shouldn't modify text in-place cumulatively, or just take the first one.
-    # For simplicity, if "All" is selected with Insert/Delete, we'll just return the result of the first one
-    # but not actually update the global state to avoid chaos, or just update it once.
+    # Update state if text modified
     if op_type in ['insert', 'delete'] and results:
         APP_STATE["current_text"] = results[0]["updated_text"]
         
@@ -119,12 +132,18 @@ def bulk_search():
         return jsonify({"error": "No file part"}), 400
     file = request.files['file']
     algo = request.form.get('algorithm', 'Finite Automata')
+    case_sensitive = request.form.get('case_sensitive', 'false').lower() == 'true'
     
     if file:
         content = file.read().decode('utf-8', errors='ignore')
         patterns = [line.strip() for line in content.splitlines() if line.strip()]
         
-        result = AlgorithmWrapper.run_bulk_search(algo, APP_STATE["current_text"], patterns)
+        text = APP_STATE["current_text"]
+        if not case_sensitive:
+            text = text.lower()
+            patterns = [p.lower() for p in patterns]
+        
+        result = AlgorithmWrapper.run_bulk_search(algo, text, patterns)
         return jsonify(result)
     return jsonify({"error": "Upload failed"}), 400
 
@@ -133,13 +152,36 @@ def trace_algo():
     data = request.json
     algo = data.get('algorithm')
     pattern = data.get('pattern')
+    case_sensitive = data.get('case_sensitive', False)
     text = APP_STATE["current_text"]
     
-    # Limit text for trace
-    if len(text) > 100:
-        text = text[:100]
+    # Automatically limit to 500 characters for visualization
+    max_trace_length = 250
+    original_text = text
+    
+    if len(text) > max_trace_length:
+        text = text[:max_trace_length]
+        truncated = True
+    else:
+        truncated = False
+    
+    original_pattern = pattern
+    
+    # Convert to lowercase for case-insensitive
+    if not case_sensitive:
+        text = text.lower()
+        pattern = pattern.lower()
         
     result = AlgorithmWrapper.run_trace(algo, text, pattern)
+    
+    # Add metadata for frontend
+    if "error" not in result:
+        result["original_pattern"] = original_pattern
+        result["case_sensitive"] = case_sensitive
+        result["original_text"] = original_text[:max_trace_length]
+        result["truncated"] = truncated
+        result["original_length"] = len(original_text)
+    
     return jsonify(result)
 
 @app.route('/api/generate', methods=['POST'])
@@ -187,6 +229,33 @@ def benchmark():
         results.append(res)
         
     return jsonify(results)
+
+@app.route('/api/export', methods=['GET'])
+def export_results():
+    if not APP_STATE["last_results"]:
+        return jsonify({"error": "No results to export"}), 400
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write headers
+    writer.writerow(['Algorithm', 'Matches', 'Time (ms)', 'Space (KB)'])
+    
+    # Write data
+    for result in APP_STATE["last_results"]:
+        writer.writerow([
+            result.get('algorithm', 'N/A'),
+            result.get('match_count', 0),
+            round(result.get('time_taken', 0) * 1000, 4),
+            round(result.get('space_peak', 0) / 1024, 2)
+        ])
+    
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=results.csv'}
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)

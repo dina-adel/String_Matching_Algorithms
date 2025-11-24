@@ -40,10 +40,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{
                     label: 'Performance',
                     data: [0, 0],
-                    backgroundColor: ['#3b82f6', '#10b981'], // Solid Blue, Solid Green
+                    backgroundColor: ['#3b82f6', '#10b981'],
                     borderColor: ['#3b82f6', '#10b981'],
                     borderWidth: 1,
-                    barPercentage: 0.6, // Make bars slightly thinner like the image
+                    barPercentage: 0.6,
                     categoryPercentage: 0.8
                 }]
             },
@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     legend: {
                         labels: { color: '#f1f5f9', font: { family: 'Inter', size: 12 } },
                         position: 'top',
-                        align: 'end' // Align legend to the right like the image
+                        align: 'end'
                     },
                     tooltip: {
                         backgroundColor: 'rgba(15, 23, 42, 0.9)',
@@ -146,46 +146,79 @@ document.addEventListener('DOMContentLoaded', () => {
                     textContent.value = data.text;
                     textLength.textContent = data.text.length.toLocaleString();
                     statusMessage.textContent = `Loaded ${name}`;
-                    highlightMatches([], data.text); // Clear highlights
+                    highlightMatches([], data.text);
                 }
             });
     }
 
-    function highlightMatches(matches, text) {
-        // Only highlight if text is small enough to avoid performance issues
-        if (text.length > 20000) {
-            textOverlay.innerHTML = '';
-            return;
-        }
+    // FIXED: Improved highlighting function
+    function highlightMatches(matches, text, patternLength = 1) {
+        const textOverlay = document.getElementById('text-overlay');
+        const textContentEl = document.getElementById('text-content');
 
         if (!matches || matches.length === 0) {
-            textOverlay.textContent = text;
+            textOverlay.innerHTML = '';
+            textOverlay.classList.remove('active');
+            textContentEl.classList.remove('has-overlay');
             return;
         }
 
-        // Create a set for O(1) lookup
-        const matchSet = new Set(matches);
-        let html = '';
-        // Simple highlighting (assumes single char matches or start indices)
-        // For proper pattern highlighting we need pattern length.
-        // This is a simplified version that just highlights the start index char
-        // Improving to highlight full pattern would require passing pattern length
+        if (text.length > 50000) {
+            textOverlay.innerHTML = '';
+            textOverlay.classList.remove('active');
+            textContentEl.classList.remove('has-overlay');
+            return;
+        }
 
-        // Let's just highlight the start index for now to be safe with overlaps
+        const isHighlighted = new Array(text.length).fill(false);
+
+        matches.forEach(startIdx => {
+            const endIdx = Math.min(startIdx + patternLength, text.length);
+            for (let i = startIdx; i < endIdx; i++) {
+                isHighlighted[i] = true;
+            }
+        });
+
+        let html = '';
         for (let i = 0; i < text.length; i++) {
-            if (matchSet.has(i)) {
-                html += `<span class="highlight-match">${text[i]}</span>`;
+            const char = text[i];
+            const escapedChar = char === '<' ? '&lt;' : char === '>' ? '&gt;' : char === '&' ? '&amp;' : char;
+
+            if (isHighlighted[i]) {
+                html += `<span class="highlight-match">${escapedChar}</span>`;
             } else {
-                html += text[i];
+                html += `<span>${escapedChar}</span>`;
             }
         }
+
         textOverlay.innerHTML = html;
+        textOverlay.classList.add('active');
+        textContentEl.classList.add('has-overlay');
+
+        // Sync scroll positions
+        textOverlay.scrollTop = textContentEl.scrollTop;
+        textOverlay.scrollLeft = textContentEl.scrollLeft;
     }
+
+    // Sync scroll between textarea and overlay
+    textContent.addEventListener('scroll', () => {
+        textOverlay.scrollTop = textContent.scrollTop;
+        textOverlay.scrollLeft = textContent.scrollLeft;
+    });
 
     window.runOperation = function (type) {
         const algo = algoSelect.value;
+        const caseSensitiveCheckbox = document.getElementById('case-sensitive');
+        const caseSensitive = caseSensitiveCheckbox ? caseSensitiveCheckbox.checked : false;
         let pattern = '';
         let insertText = '';
+
+        console.log("=== OPERATION REQUEST ===");
+        console.log("Type:", type);
+        console.log("Algorithm:", algo);
+        console.log("Case-sensitive checkbox:", caseSensitiveCheckbox);
+        console.log("Case-sensitive value:", caseSensitive);
+        console.log("========================");
 
         if (type === 'search') {
             pattern = document.getElementById('search-pattern').value;
@@ -214,7 +247,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 type: type,
                 algorithm: algo,
                 pattern: pattern,
-                insert_text: insertText
+                insert_text: insertText,
+                case_sensitive: caseSensitive
             })
         })
             .then(res => res.json())
@@ -225,11 +259,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (Array.isArray(data)) {
-                    // Handle Compare All
-                    handleComparisonResults(data);
+                    handleComparisonResults(data, pattern.length);
                 } else {
-                    // Handle Single Result
-                    handleSingleResult(data);
+                    handleSingleResult(data, pattern.length);
                 }
             })
             .catch(err => {
@@ -238,7 +270,117 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     };
 
-    function handleSingleResult(data) {
+    function updateMatchesList(matches) {
+        matchesList.innerHTML = '';
+        if (matches && matches.length > 0) {
+            const currentText = textContent.value;
+
+            matches.slice(0, 50).forEach(idx => {
+                const div = document.createElement('div');
+                div.className = 'match-item clickable';
+
+                const patternLength = document.getElementById('search-pattern')?.value.length ||
+                    document.getElementById('insert-pattern')?.value.length ||
+                    document.getElementById('delete-pattern')?.value.length || 1;
+                const matchedString = currentText.substring(idx, idx + patternLength);
+
+                div.innerHTML = `
+                    <span style="color: var(--text-secondary);">Index ${idx}:</span> 
+                    <span style="color: var(--success-color); font-weight: bold;">"${matchedString}"</span>
+                `;
+                div.onclick = () => window.scrollToMatch(idx);
+                matchesList.appendChild(div);
+            });
+
+            if (matches.length > 50) {
+                const div = document.createElement('div');
+                div.className = 'match-item';
+                div.textContent = `...and ${matches.length - 50} more`;
+                matchesList.appendChild(div);
+            }
+        } else {
+            matchesList.innerHTML = '<div class="match-item">No matches found</div>';
+        }
+    }
+
+    // Find the runTrace function and update it to store truncation info
+    // Replace the existing window.runTrace function with this:
+
+    window.runTrace = function () {
+        const pattern = document.getElementById('search-pattern').value;
+        const algo = algoSelect.value;
+        const caseSensitiveCheckbox = document.getElementById('case-sensitive');
+        const caseSensitive = caseSensitiveCheckbox ? caseSensitiveCheckbox.checked : false;
+
+        console.log("=== TRACE REQUEST ===");
+        console.log("Pattern:", pattern);
+        console.log("Algorithm:", algo);
+        console.log("Case-sensitive checkbox element:", caseSensitiveCheckbox);
+        console.log("Case-sensitive value:", caseSensitive);
+        console.log("=====================");
+
+        if (algo === 'All') {
+            alert('Please select a specific algorithm for tracing');
+            return;
+        }
+        if (!pattern) {
+            alert('Enter a pattern');
+            return;
+        }
+
+        statusMessage.textContent = 'Loading trace visualization...';
+
+        fetch('/api/trace', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                algorithm: algo,
+                pattern: pattern,
+                case_sensitive: caseSensitive
+            })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    statusMessage.textContent = 'Ready';
+                    return;
+                }
+
+                console.log("=== TRACE DATA RECEIVED ===");
+                console.log("Steps:", data.steps.length);
+                console.log("Pattern:", data.pattern);
+                console.log("Original Pattern:", data.original_pattern);
+                console.log("Text (first 100):", data.text ? data.text.substring(0, 100) : "N/A");
+                console.log("Original Text (first 100):", data.original_text ? data.original_text.substring(0, 100) : "N/A");
+                console.log("Case Sensitive:", data.case_sensitive);
+                console.log("===========================");
+
+                traceSteps = data.steps;
+                tracePattern = data.original_pattern || data.pattern;
+                // CRITICAL: Always use original_text for display (has correct casing)
+                traceText = data.original_text || data.text;
+                traceAlgorithm = data.algorithm;
+                traceCaseSensitive = data.case_sensitive || false;
+
+                // ADDED: Store truncation info globally for renderTrace to use
+                window.traceDataTruncated = data.truncated || false;
+                window.traceOriginalLength = data.original_length || traceText.length;
+                window.traceCaseSensitive = traceCaseSensitive;
+
+                currentStep = 0;
+                traceModal.style.display = 'block';
+                renderTrace();
+                statusMessage.textContent = 'Trace visualization ready';
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Failed to load trace');
+                statusMessage.textContent = 'Ready';
+            });
+    };
+
+    function handleSingleResult(data, patternLength) {
         metricsGrid.style.display = 'grid';
         comparisonTableContainer.style.display = 'none';
 
@@ -247,16 +389,18 @@ document.addEventListener('DOMContentLoaded', () => {
         spaceUsed.textContent = (data.space_peak / 1024).toFixed(2);
         statusMessage.textContent = `Completed ${data.operation}`;
 
+        // For all operations, update the text display
         if (data.updated_text) {
             textContent.value = data.updated_text;
             textLength.textContent = data.updated_text.length.toLocaleString();
         }
 
         updateMatchesList(data.matches);
-        highlightMatches(data.matches, textContent.value);
 
-        // Update Chart
-        // Reset chart to bar type if it was line
+        // Use the actual displayed text for highlighting
+        const displayText = textContent.value;
+        highlightMatches(data.matches, displayText, patternLength);
+
         if (perfChart.config.type !== 'bar') {
             perfChart.destroy();
             initChart();
@@ -266,7 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
         perfChart.data.datasets = [{
             label: data.algorithm,
             data: [data.time_taken * 1000, data.space_peak / 1024],
-            backgroundColor: ['#3b82f6', '#10b981'], // Solid Blue, Solid Green
+            backgroundColor: ['#3b82f6', '#10b981'],
             borderColor: ['#3b82f6', '#10b981'],
             borderWidth: 1
         }];
@@ -297,9 +441,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         statusMessage.textContent = 'Comparison Complete';
-        updateMatchesList(results[0].matches); // Show matches from first algo
+        updateMatchesList(results[0].matches);
 
-        // Update Chart for Comparison
         if (perfChart.config.type !== 'bar') {
             perfChart.destroy();
             initChart();
@@ -325,39 +468,12 @@ document.addEventListener('DOMContentLoaded', () => {
         perfChart.update();
     }
 
-    // Scroll Sync
-    textContent.addEventListener('scroll', () => {
-        textOverlay.scrollTop = textContent.scrollTop;
-    });
-
     window.scrollToMatch = function (index) {
         textContent.focus();
         textContent.setSelectionRange(index, index + 1);
-        // Trigger scroll by focusing
         textContent.blur();
         textContent.focus();
     };
-
-    function updateMatchesList(matches) {
-        matchesList.innerHTML = '';
-        if (matches && matches.length > 0) {
-            matches.slice(0, 50).forEach(idx => {
-                const div = document.createElement('div');
-                div.className = 'match-item clickable';
-                div.textContent = `Index: ${idx}`;
-                div.onclick = () => window.scrollToMatch(idx);
-                matchesList.appendChild(div);
-            });
-            if (matches.length > 50) {
-                const div = document.createElement('div');
-                div.className = 'match-item';
-                div.textContent = `...and ${matches.length - 50} more`;
-                matchesList.appendChild(div);
-            }
-        } else {
-            matchesList.innerHTML = '<div class="match-item">No matches found</div>';
-        }
-    }
 
     window.runBulkSearch = function () {
         const fileInput = document.getElementById('bulk-file');
@@ -396,113 +512,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = '/api/export';
     };
 
-    // Trace Logic
-    let traceSteps = [];
-    let currentStep = 0;
-    let traceTimer = null;
-
-    window.runTrace = function () {
-        const pattern = document.getElementById('search-pattern').value;
-        const algo = algoSelect.value;
-
-        if (algo === 'All') {
-            alert('Please select a specific algorithm for tracing');
-            return;
-        }
-        if (!pattern) {
-            alert('Enter a pattern');
-            return;
-        }
-
-        fetch('/api/trace', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ algorithm: algo, pattern: pattern })
-        })
-            .then(res => res.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                traceSteps = data.steps;
-                currentStep = 0;
-                traceModal.style.display = 'block';
-                renderTrace();
-            });
-    };
-
-    function renderTrace() {
-        traceContainer.innerHTML = '';
-        // Assuming we are tracing the first 100 chars
-        const text = textContent.value.substring(0, 100);
-
-        for (let i = 0; i < text.length; i++) {
-            const span = document.createElement('span');
-            span.className = 'trace-char';
-            span.textContent = text[i];
-            span.id = `trace-char-${i}`;
-            traceContainer.appendChild(span);
-        }
-
-        updateTraceView();
-    }
-
-    function updateTraceView() {
-        if (currentStep >= traceSteps.length) return;
-
-        const step = traceSteps[currentStep];
-
-        // Reset styles
-        document.querySelectorAll('.trace-char').forEach(el => el.className = 'trace-char');
-
-        // Highlight current
-        if (step.index !== undefined) {
-            const el = document.getElementById(`trace-char-${step.index}`);
-            if (el) {
-                el.classList.add('active');
-                if (step.match) {
-                    el.classList.add('match-found');
-                }
-            }
-        }
-
-        statusMessage.textContent = `Step ${currentStep + 1}: ${step.description}`;
-    }
-
-    traceNext.onclick = () => {
-        if (currentStep < traceSteps.length - 1) {
-            currentStep++;
-            updateTraceView();
-        }
-    };
-
-    tracePrev.onclick = () => {
-        if (currentStep > 0) {
-            currentStep--;
-            updateTraceView();
-        }
-    };
-
-    tracePlay.onclick = () => {
-        if (traceTimer) {
-            clearInterval(traceTimer);
-            traceTimer = null;
-            tracePlay.textContent = 'Play';
-        } else {
-            tracePlay.textContent = 'Pause';
-            traceTimer = setInterval(() => {
-                if (currentStep < traceSteps.length - 1) {
-                    currentStep++;
-                    updateTraceView();
-                } else {
-                    clearInterval(traceTimer);
-                    traceTimer = null;
-                    tracePlay.textContent = 'Play';
-                }
-            }, 200);
-        }
-    };
     window.generateDataset = function () {
         const type = document.getElementById('gen-type').value;
         const length = document.getElementById('gen-length').value;
@@ -563,14 +572,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Render Line Chart
                 const datasets = [];
                 let labels = [];
 
-                // Data can be a single result obj or list of result objs
                 const results = Array.isArray(data) ? data : [data];
-
-                // Use labels from the first result
                 labels = results[0].data.map(d => d.length);
 
                 const colors = ['#3b82f6', '#10b981', '#ef4444'];
@@ -578,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 results.forEach((res, idx) => {
                     datasets.push({
                         label: res.algorithm,
-                        data: res.data.map(d => d.time * 1000), // ms
+                        data: res.data.map(d => d.time * 1000),
                         borderColor: colors[idx % colors.length],
                         backgroundColor: colors[idx % colors.length],
                         fill: false,
@@ -586,7 +591,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 });
 
-                // Destroy old chart if it was bar, or just update
                 if (perfChart) perfChart.destroy();
 
                 perfChart = new Chart(ctx, {
@@ -618,4 +622,279 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusMessage.textContent = 'Benchmark Complete';
             });
     };
+
+    // ENHANCED TRACE VISUALIZATION WITH MATCH COUNTER
+    let traceSteps = [];
+    let currentStep = 0;
+    let traceTimer = null;
+    let tracePattern = '';
+    let traceText = '';
+    let traceAlgorithm = '';
+    let traceCaseSensitive = false;
+
+    function renderTrace() {
+        traceContainer.innerHTML = '';
+
+        // Get algorithm name from steps
+        const algoName = traceSteps.length > 0 ? traceSteps[0].description : '';
+
+        // Count matches from trace steps
+        let matchCount = 0;
+        const matchPositions = [];
+        traceSteps.forEach(step => {
+            if (step.match && step.match_index !== undefined) {
+                if (!matchPositions.includes(step.match_index)) {
+                    matchPositions.push(step.match_index);
+                    matchCount++;
+                }
+            }
+        });
+
+        // Create results summary header
+        const resultsHeader = document.createElement('div');
+        resultsHeader.className = 'trace-results-header';
+        const caseSensitiveText = window.traceCaseSensitive ? '🔤 Case-sensitive search' : '🔍 Case-insensitive search';
+        const matchText = matchCount === 1 ? '1 Match Found' : `${matchCount} Matches Found`;
+        const patternText = matchCount === 1
+            ? `Pattern "${tracePattern}" found 1 time in the text`
+            : `Pattern "${tracePattern}" found ${matchCount} times in the text`;
+
+        resultsHeader.innerHTML = `
+        <div style="text-align: center; margin-bottom: 1.5rem; padding: 1rem; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%); border-radius: 0.75rem; border: 1px solid rgba(59, 130, 246, 0.3);">
+            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🎯 Pattern Search Results</div>
+            <div style="font-size: 1.8rem; font-weight: bold; color: ${matchCount > 0 ? 'var(--success-color)' : 'var(--danger-color)'}; margin-bottom: 0.25rem;">
+                ${matchText}
+            </div>
+            <div style="font-size: 1rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                ${patternText}
+            </div>
+            <div style="font-size: 0.9rem; color: var(--accent-color);">
+                ${caseSensitiveText}
+            </div>
+        </div>
+    `;
+        traceContainer.appendChild(resultsHeader);
+
+        // Algorithm explanation based on type
+        const algorithmExplanations = {
+            'Finite Automata': `
+            <strong>How it works:</strong> Builds a state machine with ${tracePattern.length + 1} states (0 to ${tracePattern.length}). 
+            Each character read transitions between states. When state ${tracePattern.length} is reached, a match is found.
+            <br><strong>Watch for:</strong> State transitions and when the final state is reached (green highlight).
+        `,
+            'Z-Algorithm': `
+            <strong>How it works:</strong> Creates string "pattern$text" and computes Z-values (longest substring starting at each position that matches the prefix). 
+            Uses Z-box optimization to avoid redundant comparisons.
+            <br><strong>Watch for:</strong> When Z-value equals ${tracePattern.length} (pattern length), a match is found. Yellow shows comparison areas.
+        `,
+            'Bitap': `
+            <strong>How it works:</strong> Uses bitwise operations with a bit vector representing pattern positions. 
+            Each character shifts the vector and applies character masks. The MSB (leftmost bit) indicates a complete match.
+            <br><strong>Watch for:</strong> Bit vectors updating (shown in binary) and when the MSB is set (match found).
+        `
+        };
+
+        // Determine which algorithm
+        let currentAlgo = 'Finite Automata';
+        if (algoName.includes('Z-Algorithm')) currentAlgo = 'Z-Algorithm';
+        if (algoName.includes('Bitap')) currentAlgo = 'Bitap';
+
+        // Create pattern info with truncation warning if needed
+        const patternInfo = document.createElement('div');
+        patternInfo.className = 'trace-pattern-info';
+
+        // Check if we have truncation info from the response
+        const truncationWarning = window.traceDataTruncated
+            ? `<br><span style="color: #fbbf24;">⚠️ Text truncated from ${window.traceOriginalLength.toLocaleString()} to ${traceText.length} characters for visualization</span>`
+            : '';
+
+        patternInfo.innerHTML = `
+        <strong>Pattern:</strong> "${tracePattern}" (length: ${tracePattern.length})<br>
+        <strong>Text Length:</strong> ${traceText.length} characters${truncationWarning}<br>
+        <strong>Algorithm:</strong> ${currentAlgo}
+    `;
+        traceContainer.appendChild(patternInfo);
+
+        // Add algorithm explanation
+        const explanation = document.createElement('div');
+        explanation.className = 'algorithm-explanation';
+        explanation.innerHTML = algorithmExplanations[currentAlgo] || '';
+        traceContainer.appendChild(explanation);
+
+        // Create legend
+        const legend = document.createElement('div');
+        legend.className = 'trace-legend';
+        legend.innerHTML = `
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="width: 20px; height: 20px; background: var(--accent-color); border-radius: 3px;"></span>
+                <span style="font-size: 0.85rem;">Current Position</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="width: 20px; height: 20px; background: rgba(251, 191, 36, 0.3); border: 1px solid #fbbf24; border-radius: 3px;"></span>
+                <span style="font-size: 0.85rem;">Comparing</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="width: 20px; height: 20px; background: var(--success-color); border-radius: 3px;"></span>
+                <span style="font-size: 0.85rem;">Match Found</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="width: 20px; height: 20px; background: rgba(16, 185, 129, 0.6); border: 1px solid var(--success-color); border-radius: 3px;"></span>
+                <span style="font-size: 0.85rem;">Previous Match</span>
+            </div>
+        </div>
+    `;
+        traceContainer.appendChild(legend);
+
+        // Create text display area
+        const textDisplay = document.createElement('div');
+        textDisplay.className = 'trace-text-display';
+        textDisplay.id = 'trace-text-display';
+
+        // Render each character
+        for (let i = 0; i < traceText.length; i++) {
+            const span = document.createElement('span');
+            span.className = 'trace-char';
+            span.textContent = traceText[i];
+            span.id = `trace-char-${i}`;
+            span.dataset.index = i;
+            textDisplay.appendChild(span);
+        }
+
+        traceContainer.appendChild(textDisplay);
+
+        // Create step info display
+        const stepInfo = document.createElement('div');
+        stepInfo.className = 'trace-step-info';
+        stepInfo.id = 'trace-step-info';
+        traceContainer.appendChild(stepInfo);
+
+        updateTraceView();
+    }
+
+    function updateTraceView() {
+        if (currentStep >= traceSteps.length) {
+            currentStep = traceSteps.length - 1;
+        }
+        if (currentStep < 0) {
+            currentStep = 0;
+        }
+
+        const step = traceSteps[currentStep];
+        const stepInfo = document.getElementById('trace-step-info');
+
+        // Reset all characters
+        document.querySelectorAll('.trace-char').forEach(el => {
+            el.className = 'trace-char';
+        });
+
+        if (stepInfo) {
+            const stepNum = currentStep + 1;
+            const totalSteps = traceSteps.length;
+            const matchesUpToNow = traceSteps.slice(0, currentStep + 1).filter(s => s.match === true).length;
+
+            stepInfo.innerHTML = `
+                <div class="step-counter">Step ${stepNum} / ${totalSteps} | Matches found so far: ${matchesUpToNow}</div>
+                <div class="step-description">${step.description || ''}</div>
+                ${step.state_info ? `<div class="step-state">${step.state_info}</div>` : ''}
+            `;
+        }
+
+        // Highlight current step
+        if (step.highlight_ranges && step.highlight_ranges.length > 0) {
+            step.highlight_ranges.forEach(range => {
+                for (let i = range.start; i < range.end && i < traceText.length; i++) {
+                    const el = document.getElementById(`trace-char-${i}`);
+                    if (el) {
+                        if (range.type === 'match') {
+                            el.classList.add('trace-match');
+                        } else if (range.type === 'current') {
+                            el.classList.add('trace-current');
+                        } else if (range.type === 'compare') {
+                            el.classList.add('trace-compare');
+                        }
+                    }
+                }
+            });
+        }
+
+        // Keep all previous matches highlighted
+        for (let i = 0; i <= currentStep; i++) {
+            const prevStep = traceSteps[i];
+            if (prevStep.match && prevStep.highlight_ranges) {
+                prevStep.highlight_ranges.forEach(range => {
+                    if (range.type === 'match') {
+                        for (let j = range.start; j < range.end && j < traceText.length; j++) {
+                            const el = document.getElementById(`trace-char-${j}`);
+                            if (el && !el.classList.contains('trace-current') && !el.classList.contains('trace-match')) {
+                                el.classList.add('trace-match-persistent');
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        statusMessage.textContent = step.description || `Step ${currentStep + 1}`;
+    }
+
+    tracePrev.onclick = () => {
+        if (traceTimer) {
+            clearInterval(traceTimer);
+            traceTimer = null;
+            tracePlay.textContent = 'Play';
+        }
+        if (currentStep > 0) {
+            currentStep--;
+            updateTraceView();
+        }
+    };
+
+    traceNext.onclick = () => {
+        if (traceTimer) {
+            clearInterval(traceTimer);
+            traceTimer = null;
+            tracePlay.textContent = 'Play';
+        }
+        if (currentStep < traceSteps.length - 1) {
+            currentStep++;
+            updateTraceView();
+        }
+    };
+
+    tracePlay.onclick = () => {
+        if (traceTimer) {
+            clearInterval(traceTimer);
+            traceTimer = null;
+            tracePlay.textContent = 'Play';
+        } else {
+            tracePlay.textContent = 'Pause';
+            traceTimer = setInterval(() => {
+                if (currentStep < traceSteps.length - 1) {
+                    currentStep++;
+                    updateTraceView();
+                } else {
+                    clearInterval(traceTimer);
+                    traceTimer = null;
+                    tracePlay.textContent = 'Play';
+                }
+            }, 500);
+        }
+    };
+
+    document.addEventListener('keydown', (e) => {
+        if (traceModal.style.display === 'block') {
+            if (e.key === 'ArrowLeft') {
+                tracePrev.click();
+            } else if (e.key === 'ArrowRight') {
+                traceNext.click();
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                tracePlay.click();
+            } else if (e.key === 'Escape') {
+                closeModal.click();
+            }
+        }
+    });
+
 });

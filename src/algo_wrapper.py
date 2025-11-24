@@ -101,7 +101,8 @@ class AlgorithmWrapper:
         
         try:
             for pattern in patterns:
-                if not pattern.strip(): continue
+                if not pattern.strip(): 
+                    continue
                 
                 # Skip Bitap for long patterns
                 if algo_name == "Bitap" and len(pattern) > 64:
@@ -135,71 +136,236 @@ class AlgorithmWrapper:
     def run_trace(algo_name: str, text: str, pattern: str) -> Dict[str, Any]:
         """
         Generates a step-by-step trace of the algorithm for visualization.
+        Shows how each algorithm actually works with the data.
+        Note: Text should be pre-limited to 500 chars by the caller.
         """
         steps = []
         n = len(text)
         m = len(pattern)
         
-        if n > 100:
-            return {"error": "Text too long for visualization (max 100 chars)"}
+        if m == 0:
+            return {"error": "Pattern cannot be empty"}
+        
+        if n == 0:
+            return {"error": "Text cannot be empty"}
 
         if algo_name == "Finite Automata":
-            # Use the actual class to get the transition table
             try:
                 fa = FiniteAutomataMatching(pattern)
                 transition_table = fa.transition_table
             except Exception as e:
                 return {"error": f"Failed to initialize FA: {str(e)}"}
 
+            # Step 0: Show the pattern and initial state
+            steps.append({
+                "type": "init",
+                "pattern": pattern,
+                "description": f"🔍 Finite Automata initialized for pattern: '{pattern}' (length {m})",
+                "highlight_ranges": [],
+                "state_info": f"Starting in state 0"
+            })
+
             state = 0
             for i in range(n):
                 char = text[i]
-                # Look up next state
-                # The table keys are (state, char)
-                # If char not in alphabet, it might not be in table, or FA handles it.
-                # The FA implementation resets to 0 if char not in table (lines 111-115 of finite_automata.py)
-                
+                prev_state = state
                 next_state = transition_table.get((state, char), 0)
                 
-                steps.append({
+                # Highlight current position being checked
+                step = {
+                    "type": "compare",
                     "index": i,
-                    "state": state,
                     "char": char,
+                    "state": prev_state,
+                    "next_state": next_state,
                     "match": False,
-                    "description": f"State {state}, Read '{char}' -> State {next_state}"
-                })
+                    "description": f"📍 Position {i}: Read '{char}' | State {prev_state} → {next_state}",
+                    "highlight_ranges": [{"start": i, "end": i + 1, "type": "current"}],
+                    "state_info": f"State: {prev_state} → {next_state}"
+                }
                 
                 state = next_state
+                
+                # Check if we found a match
                 if state == m:
-                    steps[-1]["match"] = True
-                    steps[-1]["description"] += " -> MATCH!"
+                    match_start = i - m + 1
+                    step["match"] = True
+                    step["match_index"] = match_start
+                    step["description"] = f"✅ Position {i}: Read '{char}' → State {m} (MATCH at index {match_start}!)"
+                    step["highlight_ranges"] = [
+                        {"start": match_start, "end": i + 1, "type": "match"}
+                    ]
+                    step["state_info"] = f"MATCH FOUND! Pattern found at position {match_start}"
+                
+                steps.append(step)
 
         elif algo_name == "Z-Algorithm":
-            # Simulate Z-Algo comparison
+            # Build the concatenated string
             concat = pattern + "$" + text
-            l = len(concat)
-            # We only trace the part corresponding to 'text'
-            # This is a simplified view showing the scan
-            for i in range(m + 1, l):
-                steps.append({
-                    "index": i - (m + 1),
-                    "char": concat[i],
-                    "description": f"Scanning index {i - (m + 1)}"
-                })
-                if concat[i] == pattern[0]:
-                     steps[-1]["possible_match"] = True
+            concat_len = len(concat)
+            
+            # Step 0: Show pattern and separator
+            steps.append({
+                "type": "init",
+                "pattern": pattern,
+                "description": f"🔍 Z-Algorithm: Pattern '{pattern}' concatenated with '$' separator",
+                "highlight_ranges": [],
+                "state_info": f"Looking for Z-values equal to pattern length ({m})"
+            })
+            
+            # Calculate Z-array with visualization
+            Z = [0] * concat_len
+            Z[0] = concat_len
+            
+            L, R = 0, 0
+            matches_found = []
+            
+            for i in range(1, concat_len):
+                # Only visualize the text part (after pattern + $)
+                if i <= m:
+                    continue
+                    
+                text_idx = i - (m + 1)
+                if text_idx >= n:
+                    break
+                
+                # Calculate Z[i]
+                if i > R:
+                    # Case 1: Outside Z-box
+                    L, R = i, i
+                    while R < concat_len and concat[R] == concat[R - L]:
+                        R += 1
+                    Z[i] = R - L
+                    R -= 1
+                    
+                    compare_len = Z[i]
+                    step = {
+                        "type": "compare",
+                        "index": text_idx,
+                        "z_value": Z[i],
+                        "box": [L - (m + 1), max(0, R - (m + 1))],
+                        "match": Z[i] == m,
+                        "description": f"📍 Position {text_idx}: Outside Z-box, comparing prefix... Z = {Z[i]}",
+                        "highlight_ranges": [
+                            {"start": text_idx, "end": min(text_idx + compare_len, n), "type": "compare"}
+                        ],
+                        "state_info": f"Z-box: [{L - (m + 1)}, {R - (m + 1)}]"
+                    }
+                    
+                    if Z[i] == m:
+                        step["match_index"] = text_idx
+                        step["description"] = f"✅ Position {text_idx}: Z = {m} → MATCH FOUND!"
+                        step["highlight_ranges"] = [
+                            {"start": text_idx, "end": text_idx + m, "type": "match"}
+                        ]
+                        step["state_info"] = f"MATCH! Z-value equals pattern length"
+                        matches_found.append(text_idx)
+                else:
+                    # Case 2: Inside Z-box
+                    k = i - L
+                    if Z[k] < R - i + 1:
+                        Z[i] = Z[k]
+                    else:
+                        L = i
+                        while R < concat_len and concat[R] == concat[R - L]:
+                            R += 1
+                        Z[i] = R - L
+                        R -= 1
+                    
+                    compare_len = Z[i]
+                    step = {
+                        "type": "compare",
+                        "index": text_idx,
+                        "z_value": Z[i],
+                        "box": [L - (m + 1), max(0, R - (m + 1))],
+                        "match": Z[i] == m,
+                        "description": f"📍 Position {text_idx}: Inside Z-box, Z = {Z[i]}",
+                        "highlight_ranges": [
+                            {"start": text_idx, "end": min(text_idx + compare_len, n), "type": "compare"}
+                        ],
+                        "state_info": f"Using Z-box optimization"
+                    }
+                    
+                    if Z[i] == m:
+                        step["match_index"] = text_idx
+                        step["description"] = f"✅ Position {text_idx}: Z = {m} → MATCH FOUND!"
+                        step["highlight_ranges"] = [
+                            {"start": text_idx, "end": text_idx + m, "type": "match"}
+                        ]
+                        step["state_info"] = f"MATCH! Z-value equals pattern length"
+                        matches_found.append(text_idx)
+                
+                steps.append(step)
 
         elif algo_name == "Bitap":
-             # Simulate Bitap
-             steps.append({"description": "Bitap uses bitwise operations, scanning text..."})
-             for i in range(n):
-                 steps.append({
-                     "index": i,
-                     "char": text[i],
-                     "description": f"Processing char '{text[i]}'"
-                 })
+            # Step 0: Initialize
+            steps.append({
+                "type": "init",
+                "pattern": pattern,
+                "description": f"🔍 Bitap Algorithm: Pattern '{pattern}' (bitwise matching)",
+                "highlight_ranges": [],
+                "state_info": f"Using bit vector of length {m}"
+            })
+            
+            # Precompute pattern masks
+            pattern_mask = {}
+            for j, char in enumerate(pattern):
+                if char not in pattern_mask:
+                    pattern_mask[char] = 0
+                pattern_mask[char] |= (1 << j)
+            
+            # Show mask info
+            mask_desc = " | ".join([f"'{c}': {bin(pattern_mask[c])[2:].zfill(m)}" for c in sorted(pattern_mask.keys())[:5]])
+            steps.append({
+                "type": "setup",
+                "description": f"📋 Pattern masks computed: {mask_desc}",
+                "highlight_ranges": [],
+                "state_info": "Bit masks ready for matching"
+            })
+            
+            R = 0
+            for i in range(n):
+                char = text[i]
+                old_R = R
+                
+                # Shift and add the character mask
+                R = ((R << 1) | 1) & pattern_mask.get(char, 0)
+                
+                # Check if we have a match
+                match = (R & (1 << (m - 1))) != 0
+                
+                step = {
+                    "type": "compare",
+                    "index": i,
+                    "char": char,
+                    "bit_vector": bin(R)[2:].zfill(m) if R > 0 else "0" * m,
+                    "match": match,
+                    "description": f"📍 Position {i}: Read '{char}' | Bit vector: {bin(R)[2:].zfill(m) if R > 0 else '0' * m}",
+                    "highlight_ranges": [
+                        {"start": i, "end": i + 1, "type": "current"}
+                    ],
+                    "state_info": f"Active bits: {bin(R).count('1')}"
+                }
+                
+                if match:
+                    match_start = i - m + 1
+                    step["match_index"] = match_start
+                    step["description"] = f"✅ Position {i}: Read '{char}' → MATCH at index {match_start}!"
+                    step["highlight_ranges"] = [
+                        {"start": match_start, "end": i + 1, "type": "match"}
+                    ]
+                    step["state_info"] = f"MATCH FOUND! MSB is set"
+                
+                steps.append(step)
 
-        return {"steps": steps, "algorithm": algo_name}
+        return {
+            "steps": steps,
+            "algorithm": algo_name,
+            "pattern": pattern,
+            "text": text,
+            "pattern_length": m,
+            "text_length": n
+        }
 
     @staticmethod
     def generate_text(type: str, length: int) -> str:
@@ -208,6 +374,7 @@ class AlgorithmWrapper:
         """
         import random
         import string
+        import urllib.request
 
         if length > 1000000:
             raise ValueError("Max length is 1,000,000 characters")
@@ -215,9 +382,35 @@ class AlgorithmWrapper:
         if type == "dna":
             return ''.join(random.choices("ACGT", k=length))
         elif type == "text":
-            # Use printable characters (letters, digits, punctuation, space)
-            chars = string.ascii_letters + string.digits + " .,!?"
-            return ''.join(random.choices(chars, k=length))
+            # Try to fetch real English text from Project Gutenberg (Alice in Wonderland)
+            try:
+                url = "https://www.gutenberg.org/files/11/11-0.txt"
+                with urllib.request.urlopen(url, timeout=5) as response:
+                    data = response.read().decode('utf-8')
+                
+                # Clean up the text (remove header/footer roughly)
+                start_idx = data.find("*** START OF THE PROJECT GUTENBERG EBOOK")
+                end_idx = data.find("*** END OF THE PROJECT GUTENBERG EBOOK")
+                
+                if start_idx != -1 and end_idx != -1:
+                    text_content = data[start_idx:end_idx]
+                else:
+                    text_content = data
+
+                # Remove newlines and extra spaces to make it a continuous stream for searching
+                text_content = " ".join(text_content.split())
+                
+                # Repeat text if it's too short, or slice it if it's too long
+                while len(text_content) < length:
+                    text_content += " " + text_content
+                
+                return text_content[:length]
+
+            except Exception as e:
+                # Fallback to random generation if fetch fails
+                print(f"Failed to fetch text: {e}")
+                chars = string.ascii_letters + string.digits + " .,!?"
+                return ''.join(random.choices(chars, k=length))
         else:
             raise ValueError("Unknown type")
 
