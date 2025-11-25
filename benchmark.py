@@ -25,7 +25,6 @@ def main():
     
     # Generate outputs
     evaluator.save_results()
-    evaluator.plot_scaling_analysis()
     evaluator.generate_report()
     
     print("\n" + "="*70)
