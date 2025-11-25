@@ -1,7 +1,12 @@
 from flask import Flask, render_template, request, jsonify, Response
+import sys
 import os
 import csv
 import io
+
+# Add parent directory to path to allow importing src
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from src.datasets.data_loaders import load_sample_dataset, load_real_datasets
 from src.algo_wrapper import AlgorithmWrapper
 
@@ -23,11 +28,14 @@ def init_datasets():
     APP_STATE["datasets"]["sample_book"] = samples["book"]["text"]
     
     try:
-        real_data = load_real_datasets()
+        # Calculate absolute path to data directory (in root)
+        base_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+        real_data = load_real_datasets(base_dir=base_dir)
         APP_STATE["datasets"]["real_dna"] = real_data["dna"]["text"]
         APP_STATE["datasets"]["real_book"] = real_data["book"]["text"]
-    except Exception:
-        print("Real datasets not found, using samples only.")
+    except Exception as e:
+        print(f"Real datasets not found or error loading: {e}")
+        print("Using samples only.")
     
     APP_STATE["current_text"] = APP_STATE["datasets"]["sample_dna"]
 
