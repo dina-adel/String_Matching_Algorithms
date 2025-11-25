@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>String Matching Algorithms</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>String Matching <span class="highlight">Algorithms</span></h1>
+            <p class="subtitle">Search, Insert, and Delete with Performance Visualization</p>
+        </header>
+
+        <main>
+            <!-- Left Column: Controls & Input -->
+            <div class="panel controls-panel">
+                <div class="section">
+                    <h2>Dataset</h2>
+                    <div class="dataset-controls">
+                        <select id="dataset-select">
+                            <option value="" disabled selected>Loading datasets...</option>
+                        </select>
+                        <div class="file-upload">
+                            <label for="file-upload" class="custom-file-upload">
+                                Upload File
+                            </label>
+                            <input id="file-upload" type="file" />
+                        </div>
+                    </div>
+
+                    <!-- Generator Controls -->
+                    <div class="generator-controls"
+                        style="margin-bottom: 1rem; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 0.5rem;">
+                        <h3>Generate Custom Dataset</h3>
+                        <div class="input-row" style="display: flex; gap: 0.5rem;">
+                            <select id="gen-type">
+                                <option value="dna">DNA (ACGT)</option>
+                                <option value="text">Text (Random)</option>
+                            </select>
+                            <input type="number" id="gen-length" placeholder="Length" value="10000" max="1000000">
+                            <button class="action-btn secondary" onclick="generateDataset()">Generate</button>
+                        </div>
+                    </div>
+
+                    <div class="text-preview">
+                        <label>Current Text Preview:</label>
+                        <div id="text-content-container" class="text-container">
+                            <textarea id="text-content" readonly></textarea>
+                            <div id="text-overlay" class="text-overlay"></div>
+                        </div>
+                        <div class="stats">Length: <span id="text-length">0</span> chars</div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>Operations</h2>
+
+                    <div class="algo-select">
+                        <label>Algorithm:</label>
+                        <select id="algorithm-select">
+                            <option value="Finite Automata">Finite Automata</option>
+                            <option value="Z-Algorithm">Z-Algorithm</option>
+                            <option value="Bitap">Bitap (Limit 64 chars)</option>
+                            <option value="All">All Algorithms (Compare)</option>
+                        </select>
+                    </div>
+
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="search">Search</button>
+                        <button class="tab-btn" data-tab="insert">Insert</button>
+                        <button class="tab-btn" data-tab="delete">Delete</button>
+                        <button class="tab-btn" data-tab="bulk">Bulk</button>
+                        <button class="tab-btn" data-tab="benchmark">Benchmark</button>
+                    </div>
+                    <!-- Case Sensitivity Toggle -->
+                    <div class="case-toggle" style="margin-bottom: 1rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="case-sensitive" style="width: auto; cursor: pointer;">
+                            <span style="color: var(--text-secondary); font-size: 0.9rem;">Case Sensitive</span>
+                        </label>
+                    </div>
+
+                    <div class="tab-content active" id="search-tab">
+                        <div class="input-group">
+                            <label>Pattern to Search:</label>
+                            <input type="text" id="search-pattern" placeholder="e.g., GATC">
+                        </div>
+                        <div class="btn-group">
+                            <button class="action-btn" onclick="runOperation('search')">Search</button>
+                            <button class="action-btn secondary" onclick="runTrace()">Step-by-Step Trace</button>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="insert-tab">
+                        <div class="input-group">
+                            <label>Target Pattern:</label>
+                            <input type="text" id="insert-pattern" placeholder="Find this...">
+                        </div>
+                        <div class="input-group">
+                            <label>Insert Text (After match):</label>
+                            <input type="text" id="insert-text" placeholder="Insert this...">
+                        </div>
+                        <button class="action-btn" onclick="runOperation('insert')">Insert</button>
+                    </div>
+
+                    <div class="tab-content" id="delete-tab">
+                        <div class="input-group">
+                            <label>Pattern to Delete:</label>
+                            <input type="text" id="delete-pattern" placeholder="Delete this...">
+                        </div>
+                        <button class="action-btn warning" onclick="runOperation('delete')">Delete</button>
+                    </div>
+
+                    <div class="tab-content" id="bulk-tab">
+                        <div class="input-group">
+                            <label>Upload Patterns File (one per line):</label>
+                            <input type="file" id="bulk-file" class="file-input">
+                        </div>
+                        <button class="action-btn" onclick="runBulkSearch()">Run Bulk Search</button>
+                    </div>
+
+                    <div class="tab-content" id="benchmark-tab">
+                        <div class="input-group">
+                            <label>Pattern:</label>
+                            <input type="text" id="bench-pattern" placeholder="e.g., GATC">
+                        </div>
+                        <div class="input-group">
+                            <label>Max Length:</label>
+                            <input type="number" id="bench-max" value="100000" max="1000000">
+                        </div>
+                        <div class="input-group">
+                            <label>Step Size:</label>
+                            <input type="number" id="bench-step" value="10000">
+                        </div>
+                        <button class="action-btn" onclick="runBenchmark()">Run Benchmark</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Results & Visualization -->
+            <div class="panel results-panel">
+                <div class="section results-header">
+                    <h2>Results</h2>
+                    <div class="header-actions">
+                        <div id="status-message" class="status">Ready</div>
+                        <button class="icon-btn" onclick="exportResults()" title="Export CSV">⬇ Export</button>
+                    </div>
+                </div>
+
+                <div class="metrics-grid" id="metrics-grid">
+                    <div class="metric-card">
+                        <span class="metric-label">Matches</span>
+                        <span class="metric-value" id="match-count">-</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">Time</span>
+                        <span class="metric-value" id="time-taken">-</span>
+                        <span class="metric-unit">ms</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">Space (Peak)</span>
+                        <span class="metric-value" id="space-used">-</span>
+                        <span class="metric-unit">KB</span>
+                    </div>
+                </div>
+
+                <!-- Comparison Table (Hidden by default) -->
+                <div id="comparison-table-container" style="display:none;">
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Algorithm</th>
+                                <th>Matches</th>
+                                <th>Time (ms)</th>
+                                <th>Space (KB)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparison-body"></tbody>
+                    </table>
+                </div>
+
+                <div class="section chart-section">
+                    <h3>Performance Visualization</h3>
+                    <div class="chart-container">
+                        <canvas id="perfChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="section matches-preview">
+                    <h3>Match Locations / Trace</h3>
+                    <div id="matches-list" class="matches-scroll">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Trace Modal -->
+    <div id="trace-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Step-by-Step Visualization</h2>
+            <div id="trace-container" class="trace-view"></div>
+            <div class="trace-controls">
+                <button id="trace-prev">Previous</button>
+                <button id="trace-play">Play</button>
+                <button id="trace-next">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>
