@@ -80,14 +80,16 @@ String_Matching_Algorithms/
 │   │   └── z.py                  # Z-Algorithm
 │   ├── datasets/                 # Data Utilities
 │   │   ├── data_loaders.py       # Functions to load text files
-│   │   └── download_create_datasets.py # Script to fetch/generate data
+│   │   ├── scalable_data_generator.py    # Functions to generate scalable datasets
+│   │   └── download_create_datasets.py   # Script to fetch/generate data
 │   ├── algo_wrapper.py           # Wrapper to standardize algorithm calls
+│   ├── visualizer.py             # A simple visualizer for algorithm comparison
 │   └── performance_evaluator.py  # Class for timing and memory profiling
 │
 ├── demo.py                       # CLI script for quick algorithm demos
-├── evaluate.py                   # CLI script for full performance benchmarking
-├── performance_comparison.png    # Chart showing benchmark results
+├── benchmark.py                  # CLI script for full performance benchmarking
 ├── requirements.txt              # Project dependencies
+├── unit_test.py                  # Unit tests for algorithms 
 └── README.md                     # Project documentation
 ```
 
@@ -224,4 +226,9 @@ Run the application test suite:
 cd Application/tests
 python test_app.py
 ```
+or 
+```bash
+pytest
+```
+
 
