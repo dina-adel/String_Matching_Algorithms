@@ -83,7 +83,7 @@ String_Matching_Algorithms/
 │   │   ├── scalable_data_generator.py    # Functions to generate scalable datasets
 │   │   └── download_create_datasets.py   # Script to fetch/generate data
 │   ├── algo_wrapper.py           # Wrapper to standardize algorithm calls
-│   ├── visualizer.py             # A simple visualizer for algorithm comparison
+│   ├── visualize.py             # A simple visualizer for algorithm comparison
 │   └── performance_evaluator.py  # Class for timing and memory profiling
 │
 ├── demo.py                       # CLI script for quick algorithm demos
