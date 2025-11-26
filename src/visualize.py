@@ -37,38 +37,51 @@ class ResultsVisualizer:
         }
     
     def generate_all_plots(self):
-        """Generate all visualization plots."""
+        """Generate all visualization plots for each dataset type."""
         print("\n" + "="*70)
         print("GENERATING ALL VISUALIZATIONS")
         print("="*70)
         
-        self.plot_time_scaling_by_text_size()
-        self.plot_algorithm_comparison_bar()
-        self.plot_preprocessing_vs_search()
-        self.plot_memory_scaling()
-        self.plot_time_vs_pattern_length()
-        self.plot_throughput_analysis()
-        self.plot_speedup_comparison()
-        self.plot_time_memory_tradeoff()
+        # Identify all dataset types
+        dataset_types = sorted(list(set(r['dataset_type'] for r in self.results)))
+        print(f"Found datasets: {', '.join(dataset_types)}")
         
-        # These were missing in your previous version
-        self.plot_pattern_analysis()
-        self.generate_pattern_table()
+        for dtype in dataset_types:
+            print(f"\nProcessing dataset: {dtype}")
+            print("-" * 40)
+            
+            # Create subdirectory for this dataset
+            dtype_dir = self.output_dir / dtype
+            dtype_dir.mkdir(parents=True, exist_ok=True)
+            
+            self.plot_time_scaling_by_text_size(dtype, dtype_dir)
+            self.plot_algorithm_comparison_bar(dtype, dtype_dir)
+            self.plot_preprocessing_vs_search(dtype, dtype_dir)
+            self.plot_memory_scaling(dtype, dtype_dir)
+            self.plot_time_vs_pattern_length(dtype, dtype_dir)
+            self.plot_throughput_analysis(dtype, dtype_dir)
+            self.plot_speedup_comparison(dtype, dtype_dir)
+            self.plot_time_memory_tradeoff(dtype, dtype_dir)
+            self.plot_pattern_analysis(dtype, dtype_dir)
+            self.generate_pattern_table(dtype, dtype_dir)
         
         print("\n" + "="*70)
         print("ALL VISUALIZATIONS COMPLETE")
         print(f"Plots saved to: {self.output_dir}")
         print("="*70)
     
-    def plot_time_scaling_by_text_size(self):
+    def plot_time_scaling_by_text_size(self, dataset_type, output_dir):
         """Plot: Total time vs text size (log-log) for each algorithm."""
-        print("\n  Creating: Time Scaling by Text Size...")
+        print(f"  Creating: Time Scaling by Text Size ({dataset_type})...")
         
         fig, ax = plt.subplots(figsize=(10, 6))
         
+        # Filter results for this dataset
+        dataset_results = [r for r in self.results if r['dataset_type'] == dataset_type]
+        
         # Group by algorithm
         for algo in ['Finite Automata', 'Z-Algorithm', 'Bitap']:
-            algo_results = [r for r in self.results if r['algorithm'] == algo]
+            algo_results = [r for r in dataset_results if r['algorithm'] == algo]
             
             if not algo_results: continue
 
@@ -88,7 +101,7 @@ class ResultsVisualizer:
         
         ax.set_xlabel('Text Size (characters)', fontsize=13, fontweight='bold')
         ax.set_ylabel('Time (ms)', fontsize=13, fontweight='bold')
-        ax.set_title('Execution Time vs Text Size (English Dataset)', 
+        ax.set_title(f'Execution Time vs Text Size ({dataset_type})', 
                     fontsize=14, fontweight='bold')
         ax.set_xscale('log')
         ax.set_yscale('log')
@@ -96,16 +109,18 @@ class ResultsVisualizer:
         ax.grid(True, alpha=0.3, which='both', linestyle='--')
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / 'time_scaling.png', dpi=300, bbox_inches='tight')
+        plt.savefig(output_dir / 'time_scaling.png', dpi=300, bbox_inches='tight')
         print("    ✓ Saved: time_scaling.png")
         plt.close()
     
-    def plot_algorithm_comparison_bar(self):
+    def plot_algorithm_comparison_bar(self, dataset_type, output_dir):
         """Plot: Bar chart comparing average times by text size."""
-        print("  Creating: Algorithm Comparison Bar Chart...")
+        print(f"  Creating: Algorithm Comparison Bar Chart ({dataset_type})...")
+        
+        dataset_results = [r for r in self.results if r['dataset_type'] == dataset_type]
         
         # Get unique text sizes
-        text_sizes = sorted(set(r['text_size'] for r in self.results))
+        text_sizes = sorted(set(r['text_size'] for r in dataset_results))
         algorithms = ['Finite Automata', 'Z-Algorithm', 'Bitap']
         
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -116,7 +131,7 @@ class ResultsVisualizer:
         for i, algo in enumerate(algorithms):
             avgs = []
             for size in text_sizes:
-                times = [r['time_ms'] for r in self.results 
+                times = [r['time_ms'] for r in dataset_results 
                         if r['algorithm'] == algo and r['text_size'] == size]
                 avgs.append(np.mean(times) if times else 0)
             
@@ -138,21 +153,22 @@ class ResultsVisualizer:
         ax.set_xticklabels(size_labels, fontsize=11)
         ax.set_xlabel('Text Size', fontsize=13, fontweight='bold')
         ax.set_ylabel('Average Time (ms)', fontsize=13, fontweight='bold')
-        ax.set_title('Algorithm Performance Comparison by Text Size', 
+        ax.set_title(f'Algorithm Performance Comparison by Text Size ({dataset_type})', 
                     fontsize=14, fontweight='bold')
         ax.set_yscale('log')
         ax.legend(fontsize=11)
         ax.grid(True, alpha=0.3, axis='y', which='both')
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / 'algorithm_comparison.png', dpi=300, bbox_inches='tight')
+        plt.savefig(output_dir / 'algorithm_comparison.png', dpi=300, bbox_inches='tight')
         print("    ✓ Saved: algorithm_comparison.png")
         plt.close()
     
-    def plot_preprocessing_vs_search(self):
+    def plot_preprocessing_vs_search(self, dataset_type, output_dir):
         """Plot: Preprocessing vs Search time breakdown."""
-        print("  Creating: Preprocessing vs Search Time...")
+        print(f"  Creating: Preprocessing vs Search Time ({dataset_type})...")
         
+        dataset_results = [r for r in self.results if r['dataset_type'] == dataset_type]
         algorithms = ['Finite Automata', 'Z-Algorithm', 'Bitap']
         
         fig, ax = plt.subplots(figsize=(10, 6))
@@ -162,7 +178,7 @@ class ResultsVisualizer:
         search_times = []
         
         for algo in algorithms:
-            algo_results = [r for r in self.results if r['algorithm'] == algo]
+            algo_results = [r for r in dataset_results if r['algorithm'] == algo]
             if not algo_results:
                 prep_times.append(0)
                 search_times.append(0)
@@ -190,7 +206,7 @@ class ResultsVisualizer:
                            f'{height:.2f}', ha='center', va='bottom', fontsize=9)
         
         ax.set_ylabel('Time (ms)', fontsize=13, fontweight='bold')
-        ax.set_title('Preprocessing vs Search Time (Average Across All Tests)', 
+        ax.set_title(f'Preprocessing vs Search Time ({dataset_type})', 
                     fontsize=14, fontweight='bold')
         ax.set_xticks(x)
         ax.set_xticklabels(algorithms, fontsize=11)
@@ -199,18 +215,20 @@ class ResultsVisualizer:
         ax.grid(True, alpha=0.3, axis='y', which='both')
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / 'preprocessing_vs_search.png', dpi=300, bbox_inches='tight')
+        plt.savefig(output_dir / 'preprocessing_vs_search.png', dpi=300, bbox_inches='tight')
         print("    ✓ Saved: preprocessing_vs_search.png")
         plt.close()
     
-    def plot_memory_scaling(self):
+    def plot_memory_scaling(self, dataset_type, output_dir):
         """Plot: Memory usage vs text size."""
-        print("  Creating: Memory Scaling...")
+        print(f"  Creating: Memory Scaling ({dataset_type})...")
+        
+        dataset_results = [r for r in self.results if r['dataset_type'] == dataset_type]
         
         fig, ax = plt.subplots(figsize=(10, 6))
         
         for algo in ['Finite Automata', 'Z-Algorithm', 'Bitap']:
-            algo_results = [r for r in self.results if r['algorithm'] == algo]
+            algo_results = [r for r in dataset_results if r['algorithm'] == algo]
             
             # Group by text size
             size_groups = defaultdict(list)
@@ -225,23 +243,25 @@ class ResultsVisualizer:
         
         ax.set_xlabel('Text Size (characters)', fontsize=13, fontweight='bold')
         ax.set_ylabel('Peak Memory (KB)', fontsize=13, fontweight='bold')
-        ax.set_title('Memory Usage vs Text Size', fontsize=14, fontweight='bold')
+        ax.set_title(f'Memory Usage vs Text Size ({dataset_type})', fontsize=14, fontweight='bold')
         ax.set_xscale('log')
         ax.set_yscale('log')
         ax.legend(fontsize=11)
         ax.grid(True, alpha=0.3, which='both', linestyle='--')
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / 'memory_scaling.png', dpi=300, bbox_inches='tight')
+        plt.savefig(output_dir / 'memory_scaling.png', dpi=300, bbox_inches='tight')
         print("    ✓ Saved: memory_scaling.png")
         plt.close()
     
-    def plot_time_vs_pattern_length(self):
+    def plot_time_vs_pattern_length(self, dataset_type, output_dir):
         """Plot: Time vs pattern length - Separated by text size."""
-        print("  Creating: Time vs Pattern Length (by text size)...")
+        print(f"  Creating: Time vs Pattern Length ({dataset_type})...")
+        
+        dataset_results = [r for r in self.results if r['dataset_type'] == dataset_type]
         
         # Get unique text sizes
-        text_sizes = sorted(set(r['text_size'] for r in self.results))
+        text_sizes = sorted(set(r['text_size'] for r in dataset_results))
         
         # Create subplots for different text sizes
         fig, axes = plt.subplots(2, 3, figsize=(18, 10))
@@ -252,7 +272,7 @@ class ResultsVisualizer:
             
             for algo in ['Finite Automata', 'Z-Algorithm', 'Bitap']:
                 # Filter by algorithm AND text size
-                filtered = [r for r in self.results 
+                filtered = [r for r in dataset_results 
                            if r['algorithm'] == algo and r['text_size'] == text_size]
                 
                 if not filtered:
@@ -280,21 +300,23 @@ class ResultsVisualizer:
         for idx in range(len(text_sizes), 6):
             axes[idx].axis('off')
         
-        plt.suptitle('Execution Time vs Pattern Length (Separated by Text Size)', 
+        plt.suptitle(f'Execution Time vs Pattern Length ({dataset_type})', 
                     fontsize=15, fontweight='bold')
         plt.tight_layout(rect=[0, 0, 1, 0.97])
-        plt.savefig(self.output_dir / 'time_vs_pattern_length.png', dpi=300, bbox_inches='tight')
+        plt.savefig(output_dir / 'time_vs_pattern_length.png', dpi=300, bbox_inches='tight')
         print("    ✓ Saved: time_vs_pattern_length.png")
         plt.close()
     
-    def plot_throughput_analysis(self):
+    def plot_throughput_analysis(self, dataset_type, output_dir):
         """Plot: Throughput (MB/s) analysis."""
-        print("  Creating: Throughput Analysis...")
+        print(f"  Creating: Throughput Analysis ({dataset_type})...")
+        
+        dataset_results = [r for r in self.results if r['dataset_type'] == dataset_type]
         
         fig, ax = plt.subplots(figsize=(10, 6))
         
         for algo in ['Finite Automata', 'Z-Algorithm', 'Bitap']:
-            algo_results = [r for r in self.results if r['algorithm'] == algo]
+            algo_results = [r for r in dataset_results if r['algorithm'] == algo]
             
             # Calculate throughput for each result
             size_groups = defaultdict(list)
@@ -311,21 +333,23 @@ class ResultsVisualizer:
         
         ax.set_xlabel('Text Size (characters)', fontsize=13, fontweight='bold')
         ax.set_ylabel('Throughput (MB/s)', fontsize=13, fontweight='bold')
-        ax.set_title('Processing Throughput vs Text Size', fontsize=14, fontweight='bold')
+        ax.set_title(f'Processing Throughput vs Text Size ({dataset_type})', fontsize=14, fontweight='bold')
         ax.set_xscale('log')
         ax.legend(fontsize=11, loc='best')
         ax.grid(True, alpha=0.3, which='both', linestyle='--')
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / 'throughput.png', dpi=300, bbox_inches='tight')
+        plt.savefig(output_dir / 'throughput.png', dpi=300, bbox_inches='tight')
         print("    ✓ Saved: throughput.png")
         plt.close()
     
-    def plot_speedup_comparison(self):
+    def plot_speedup_comparison(self, dataset_type, output_dir):
         """Plot: Speedup comparison (relative to slowest algorithm)."""
-        print("  Creating: Speedup Comparison...")
+        print(f"  Creating: Speedup Comparison ({dataset_type})...")
         
-        text_sizes = sorted(set(r['text_size'] for r in self.results))
+        dataset_results = [r for r in self.results if r['dataset_type'] == dataset_type]
+        
+        text_sizes = sorted(set(r['text_size'] for r in dataset_results))
         algorithms = ['Finite Automata', 'Z-Algorithm', 'Bitap']
         
         fig, ax = plt.subplots(figsize=(10, 6))
@@ -336,7 +360,7 @@ class ResultsVisualizer:
                 # Get average times for all algorithms at this size
                 times = {}
                 for a in algorithms:
-                    a_times = [r['time_ms'] for r in self.results
+                    a_times = [r['time_ms'] for r in dataset_results
                               if r['algorithm'] == a and r['text_size'] == size]
                     times[a] = np.mean(a_times) if a_times else float('inf')
                 
@@ -350,25 +374,27 @@ class ResultsVisualizer:
         
         ax.set_xlabel('Text Size (characters)', fontsize=13, fontweight='bold')
         ax.set_ylabel('Speedup (relative to slowest)', fontsize=13, fontweight='bold')
-        ax.set_title('Relative Speedup Comparison', fontsize=14, fontweight='bold')
+        ax.set_title(f'Relative Speedup Comparison ({dataset_type})', fontsize=14, fontweight='bold')
         ax.set_xscale('log')
         ax.axhline(y=1.0, color='red', linestyle='--', alpha=0.5, linewidth=2)
         ax.legend(fontsize=11)
         ax.grid(True, alpha=0.3, which='both', linestyle='--')
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / 'speedup_comparison.png', dpi=300, bbox_inches='tight')
+        plt.savefig(output_dir / 'speedup_comparison.png', dpi=300, bbox_inches='tight')
         print("    ✓ Saved: speedup_comparison.png")
         plt.close()
     
-    def plot_time_memory_tradeoff(self):
+    def plot_time_memory_tradeoff(self, dataset_type, output_dir):
         """Plot: Time vs Memory scatter plot showing trade-offs."""
-        print("  Creating: Time-Memory Tradeoff...")
+        print(f"  Creating: Time-Memory Tradeoff ({dataset_type})...")
+        
+        dataset_results = [r for r in self.results if r['dataset_type'] == dataset_type]
         
         fig, ax = plt.subplots(figsize=(10, 7))
         
         for algo in ['Finite Automata', 'Z-Algorithm', 'Bitap']:
-            algo_results = [r for r in self.results if r['algorithm'] == algo]
+            algo_results = [r for r in dataset_results if r['algorithm'] == algo]
             
             times = [r['time_ms'] for r in algo_results]
             memories = [r.get('memory_peak_kb', 0) for r in algo_results]
@@ -380,7 +406,7 @@ class ResultsVisualizer:
         
         ax.set_xlabel('Peak Memory (KB)', fontsize=13, fontweight='bold')
         ax.set_ylabel('Time (ms)', fontsize=13, fontweight='bold')
-        ax.set_title('Time vs Memory Trade-off\n(bubble size = text size)', 
+        ax.set_title(f'Time vs Memory Trade-off ({dataset_type})\n(bubble size = text size)', 
                     fontsize=14, fontweight='bold')
         ax.set_xscale('log')
         ax.set_yscale('log')
@@ -388,11 +414,11 @@ class ResultsVisualizer:
         ax.grid(True, alpha=0.3, which='both', linestyle='--')
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / 'time_memory_tradeoff.png', dpi=300, bbox_inches='tight')
+        plt.savefig(output_dir / 'time_memory_tradeoff.png', dpi=300, bbox_inches='tight')
         print("    ✓ Saved: time_memory_tradeoff.png")
         plt.close()
 
-    def plot_pattern_analysis(self):
+    def plot_pattern_analysis(self, dataset_type, output_dir):
         """
         Plot 4-panel analysis of pattern characteristics:
         1. Pattern Length Dist
@@ -400,16 +426,18 @@ class ResultsVisualizer:
         3. Length Category Impact
         4. Complexity Impact
         """
-        print("  Creating: Pattern Analysis 4-Panel...")
+        print(f"  Creating: Pattern Analysis 4-Panel ({dataset_type})...")
+        
+        dataset_results = [r for r in self.results if r['dataset_type'] == dataset_type]
         
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
         
         # Data Preparation
-        lengths = [r['pattern_length'] for r in self.results]
-        matches = [r.get('matches_found', 0) for r in self.results]
-        times = [r['time_ms'] for r in self.results]
-        algos = [r['algorithm'] for r in self.results]
-        patterns = [r['pattern'] for r in self.results]
+        lengths = [r['pattern_length'] for r in dataset_results]
+        matches = [r.get('matches_found', 0) for r in dataset_results]
+        times = [r['time_ms'] for r in dataset_results]
+        algos = [r['algorithm'] for r in dataset_results]
+        patterns = [r['pattern'] for r in dataset_results]
         
         # 1. Histogram of Pattern Lengths
         ax1.hist(lengths, bins=15, color='#2A9D8F', alpha=0.7, edgecolor='black')
@@ -433,13 +461,13 @@ class ResultsVisualizer:
         
         # 3. Bar: Short/Medium/Long Categories
         categories = {'Short (<5)': [], 'Medium (5-10)': [], 'Long (>10)': []}
-        for r in self.results:
+        for r in dataset_results:
             cat = 'Short (<5)' if r['pattern_length'] < 5 else \
                   'Medium (5-10)' if r['pattern_length'] <= 10 else 'Long (>10)'
             categories[cat].append(r['time_ms'])
             
         cat_names = list(categories.keys())
-        cat_avgs = [np.mean(categories[c]) for c in cat_names]
+        cat_avgs = [np.mean(categories[c]) if categories[c] else 0 for c in cat_names]
         ax3.bar(cat_names, cat_avgs, color=['#457B9D', '#2A9D8F', '#E63946'])
         ax3.set_title("Average Execution Time by Pattern Category", fontweight='bold')
         ax3.set_ylabel("Avg Time (ms)")
@@ -454,22 +482,24 @@ class ResultsVisualizer:
         ax4.set_yscale('log')
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / 'pattern_analysis.png', dpi=300, bbox_inches='tight')
+        plt.savefig(output_dir / 'pattern_analysis.png', dpi=300, bbox_inches='tight')
         print("    ✓ Saved: pattern_analysis.png")
         plt.close()
 
-    def generate_pattern_table(self):
+    def generate_pattern_table(self, dataset_type, output_dir):
         """
         Generate a detailed table comparing algorithms for every pattern tested.
         Saves as both a text file and a PNG image.
         """
-        print("  Creating: Pattern Details Table (Text & Image)...")
+        print(f"  Creating: Pattern Details Table ({dataset_type})...")
+        
+        dataset_results = [r for r in self.results if r['dataset_type'] == dataset_type]
         
         # Group results by (text_size, pattern)
         # Key: (size, pattern), Value: {algo: time, meta: {len, matches}}
         grouped = defaultdict(dict)
         
-        for r in self.results:
+        for r in dataset_results:
             key = (r['text_size'], r['pattern'])
             # Store algorithm time
             grouped[key][r['algorithm']] = r['time_ms']
@@ -505,7 +535,7 @@ class ResultsVisualizer:
         rows.sort(key=lambda x: (x['size'], x['len']))
         
         # 1. Generate Text File
-        txt_path = self.output_dir.parent / 'pattern_details.txt'
+        txt_path = output_dir / 'pattern_details.txt'
         with open(txt_path, 'w', encoding='utf-8') as f:
             # Header
             header = f"{'Size':<10} | {'Pattern':<20} | {'Len':<5} | {'Matches':<8} | {'FA (ms)':<12} | {'Z-Algo (ms)':<12} | {'Bitap (ms)':<12} | {'Best'}"
@@ -528,7 +558,7 @@ class ResultsVisualizer:
         
         fig, ax = plt.subplots(figsize=(14, len(display_rows) * 0.5 + 2))
         ax.axis('off')
-        ax.set_title("Pattern Performance Details (First 25 samples)", fontweight='bold', fontsize=14)
+        ax.set_title(f"Pattern Performance Details ({dataset_type})", fontweight='bold', fontsize=14)
         
         table_data = []
         # Columns
@@ -562,7 +592,7 @@ class ResultsVisualizer:
         tab.scale(1, 1.5)
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / 'pattern_table.png', dpi=300, bbox_inches='tight')
+        plt.savefig(output_dir / 'pattern_table.png', dpi=300, bbox_inches='tight')
         print("    ✓ Saved: pattern_table.png")
         plt.close()
         
@@ -605,7 +635,7 @@ def main():
     import sys
     
     # Check if file exists
-    json_file = "results_1/benchmark_results.json"
+    json_file = "results/benchmark_results.json"
     if len(sys.argv) > 1:
         json_file = sys.argv[1]
     
@@ -615,7 +645,7 @@ def main():
         return
     
     # Create visualizer and generate plots
-    visualizer = ResultsVisualizer(json_file, output_dir="results_1/plots")
+    visualizer = ResultsVisualizer(json_file, output_dir="results/plots")
     visualizer.generate_all_plots()
     visualizer.generate_summary_table()
     
