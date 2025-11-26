@@ -225,7 +225,3 @@ cd Application/tests
 python test_app.py
 ```
 
-
----
-
-⭐ If you find this project helpful, please consider giving it a star on GitHub!
