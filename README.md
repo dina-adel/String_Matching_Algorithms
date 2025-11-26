@@ -233,7 +233,7 @@ pytest
 For units test, run:
 
 ```bash
-python unit_test
+python unit_test.py
 ```
 
 
