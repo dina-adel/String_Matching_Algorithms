@@ -3,6 +3,9 @@ from src.datasets.data_loaders import load_sample_dataset
 from src.algorithims.finite_automata import FiniteAutomataMatching
 from src.algorithims.z import ZAlgorithm    
 from src.algorithims.bitap import BitapAlgorithm
+import matplotlib.pyplot as plt
+import numpy as np
+from typing import List, Dict
 
 def main():
     """
@@ -51,7 +54,7 @@ def main():
     # Plot results
     print("\n\n3. GENERATING PERFORMANCE PLOTS")
     print("-" * 70)
-    PerformanceEvaluator.plot_results(all_results, test_labels, 
+    plot_results(all_results, test_labels, 
                                      "String Matching Algorithms Performance Comparison")
     print("Plot saved as 'performance_comparison.png'")
     
@@ -79,6 +82,36 @@ def main():
     print("\n" + "=" * 70)
     print("DEMONSTRATION COMPLETE")
     print("=" * 70)
+
+
+def plot_results(all_results: List[Dict], labels: List[str], title: str):
+    """
+    Generate a bar chart comparing algorithm performance.
+    """
+    if not all_results:
+        print("No results to plot.")
+        return
+
+    algorithms = list(all_results[0].keys())
+    x = np.arange(len(labels))
+    width = 0.25
+    
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    for i, algo in enumerate(algorithms):
+        times = [res[algo]['time'] * 1000 for res in all_results] # Convert to ms
+        offset = (i - 1) * width
+        ax.bar(x + offset, times, width, label=algo)
+        
+    ax.set_ylabel('Time (ms)')
+    ax.set_title(title)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=45, ha='right')
+    ax.legend()
+    
+    plt.tight_layout()
+    plt.savefig('performance_comparison.png')
+    plt.close()
 
 
 if __name__ == "__main__":

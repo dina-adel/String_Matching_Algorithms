@@ -14,6 +14,11 @@ import random
 import tracemalloc
 import sys
 
+# Algorithm Imports
+from src.algorithims.finite_automata import FiniteAutomataMatching
+from src.algorithims.z import ZAlgorithm
+from src.algorithims.bitap import BitapAlgorithm
+
 
 # ============================================================================ #
 #                              BENCHMARK RESULT                                #
@@ -313,3 +318,43 @@ class PerformanceEvaluator:
                 f.write(f"  Range: {min_mem:8.2f} - {max_mem:8.2f} KB\n\n")
 
         print(f"✓ Saved report: {report_file}")
+
+    # ---------------------------------------------------------------------- #
+    #                        STATIC METHODS FOR DEMO                          #
+    # ---------------------------------------------------------------------- #
+
+    @staticmethod
+    def run_comparison(text: str, pattern: str) -> Dict[str, Dict]:
+        """
+        Run all algorithms on a single text/pattern pair and return results.
+        Used by demo.py.
+        """
+        results = {}
+        
+        algorithms = {
+            "Finite Automata": FiniteAutomataMatching,
+            "Z-Algorithm": ZAlgorithm,
+            "Bitap": BitapAlgorithm
+        }
+        
+        for name, AlgoClass in algorithms.items():
+            try:
+                # Skip Bitap for long patterns
+                if name == "Bitap" and len(pattern) > 64:
+                    results[name] = {'count': -1, 'time': 0.0}
+                    continue
+                    
+                start_time = time.perf_counter()
+                algo = AlgoClass(pattern)
+                matches = algo.search(text)
+                end_time = time.perf_counter()
+                
+                results[name] = {
+                    'count': len(matches),
+                    'time': end_time - start_time
+                }
+            except Exception as e:
+                print(f"Error running {name}: {e}")
+                results[name] = {'count': -1, 'time': 0.0}
+                
+        return results
