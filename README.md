@@ -12,7 +12,6 @@ A comprehensive Python implementation and performance analysis of three fundamen
 - [Performance Analysis](#performance-analysis)
 - [Algorithm Complexity](#algorithm-complexity)
 - [Dependencies](#dependencies)
-- [Contributing](#contributing)
 
 ## 🌟 Features
 
