@@ -230,4 +230,10 @@ or
 pytest
 ```
 
+For units test, run:
+
+```bash
+python unit_test
+```
+
 
